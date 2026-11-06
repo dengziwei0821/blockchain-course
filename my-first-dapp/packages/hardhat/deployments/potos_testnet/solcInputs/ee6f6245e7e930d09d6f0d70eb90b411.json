@@ -1,0 +1,36 @@
+{
+  "language": "Solidity",
+  "sources": {
+    "contracts/Escrow.sol": {
+      "content": "// SPDX-License-Identifier: MIT\r\npragma solidity >=0.8.0 <0.9.0;\r\n// 只声明我们要用的三个函数。Escrow 通过这个接口去调用任何 ERC20 合约。\r\ninterface IERC20 {\r\nfunction transfer(address to, uint256 value) external returns (bool);\r\nfunction transferFrom(address from, address to, uint256 value) external returns (bool);\r\nfunction balanceOf(address account) external view returns (uint256);\r\n}\r\n\r\ncontract Escrow {\r\n// ---------- 状态机 ----------\r\nenum Status { Created, Paid, Completed, Refunded, Disputed }\r\nstruct Order {\r\naddress buyer;\r\naddress seller;\r\naddress token; // 用哪种 ERC20 结算\r\nuint256 amount; // 最小单位\r\nuint256 deadline; // unix 时间戳，秒\r\nStatus status;\r\nstring description;\r\n}\r\n// ---------- 存储 ----------\r\naddress public arbiter;\r\nuint256 public orderCount;\r\nmapping(uint256 => Order) private _orders;\r\n// ---------- 事件 ----------\r\nevent OrderCreated(uint256 indexed id, address indexed buyer, address indexed seller, address token, uint256 amount, uint256 deadline);\r\nevent OrderPaid(uint256 indexed id);\r\nevent OrderCompleted(uint256 indexed id);\r\nevent OrderRefunded(uint256 indexed id);\r\nevent OrderDisputed(uint256 indexed id, address by);\r\nevent OrderResolved(uint256 indexed id, bool sellerWins);\r\n// ---------- 修饰器 ----------\r\nmodifier onlyArbiter() {\r\nrequire(msg.sender == arbiter, \"Escrow: caller is not the arbiter\");\r\n_;\r\n}\r\nmodifier onlyBuyer(uint256 id) {\r\nrequire(msg.sender == _orders[id].buyer, \"Escrow: caller is not the buyer\");\r\n_;\r\n}\r\nmodifier inStatus(uint256 id, Status s) {\r\nrequire(_orders[id].status == s, \"Escrow: wrong status\");\r\n_;\r\n}\r\nconstructor(address _arbiter) {\r\nrequire(_arbiter != address(0), \"Escrow: arbiter is the zero address\");\r\narbiter = _arbiter;\r\n}\r\nfunction getOrder(uint256 id) public view returns (Order memory) {\r\nrequire(id < orderCount, \"Escrow: order does not exist\");\r\nreturn _orders[id];\r\n}\r\n\r\n// ---------- TODO 1：创建订单 ----------\r\n// 要求：seller 不能是零地址、不能是自己；amount 大于 0；deadline 必须在未来；\r\n// 订单 id 为当前 orderCount，写入 _orders，orderCount 加一；\r\n// buyer 是 msg.sender，状态 Created；发出 OrderCreated；返回 id。\r\nfunction createOrder(address seller, address token, uint256 amount, uint256 deadline, string memory description) public returns (uint256) {\r\n    // 校验条件\r\n    require(seller != address(0), \"Escrow: seller is zero address\");\r\n    require(seller != msg.sender, \"Escrow: buyer cannot be seller\");\r\n    require(amount > 0, \"Escrow: amount must > 0\");\r\n    require(deadline > block.timestamp, \"Escrow: deadline must be future\");\r\n\r\n    uint256 newId = orderCount; // 订单ID = 当前orderCount\r\n    _orders[newId] = Order({\r\n        buyer: msg.sender,\r\n        seller: seller,\r\n        token: token,\r\n        amount: amount,\r\n        deadline: deadline,\r\n        status: Status.Created,\r\n        description: description\r\n    });\r\n    orderCount += 1; // 订单计数+1\r\n\r\n    emit OrderCreated(newId, msg.sender, seller, token, amount, deadline);\r\n    return newId;\r\n}\r\n\r\n// ---------- TODO 2：买家付款 ----------\r\n// 要求：只有买家、只在 Created 状态（用修饰器）；\r\n// 先把状态改为 Paid，再调用代币的 transferFrom 把 amount 从买家转到本合约（address(this)）；\r\n// transferFrom 返回 false 要 revert；发出 OrderPaid。\r\n// 提示：IERC20(o.token).transferFrom(...)。想清楚代币合约看到的 msg.sender 是谁。\r\nfunction deposit(uint256 id) public onlyBuyer(id) inStatus(id, Status.Created) {\r\n    Order storage o = _orders[id]; // 拿到订单存储引用\r\n    o.status = Status.Paid; // 修改状态为Paid\r\n\r\n    // 调用ERC20的transferFrom，从买家(o.buyer)转账到当前托管合约address(this)\r\n    // 注意：调用前买家必须提前给Escrow合约授权approve！\r\n    bool success = IERC20(o.token).transferFrom(o.buyer, address(this), o.amount);\r\n    require(success, \"Escrow: transferFrom failed\");\r\n\r\n    emit OrderPaid(id);\r\n}\r\n\r\n// ---------- TODO 3：买家确认收货 ----------\r\n// 要求：只有买家、只在 Paid 状态；状态改为 Completed；代币转给卖家；发出 OrderCompleted。\r\nfunction confirm(uint256 id) public onlyBuyer(id) inStatus(id, Status.Paid) {\r\n    Order storage o = _orders[id];\r\n    o.status = Status.Completed;\r\n\r\n    // 托管合约把代币转给卖家\r\n    bool success = IERC20(o.token).transfer(o.seller, o.amount);\r\n    require(success, \"Escrow: transfer failed\");\r\n\r\n    emit OrderCompleted(id);\r\n}\r\n\r\n// ---------- TODO 4：超期退款 ----------\r\n// 要求：只有买家、只在 Paid 状态；block.timestamp 必须大于 deadline；\r\n// 状态改为 Refunded；代币退回买家；发出 OrderRefunded。\r\nfunction refund(uint256 id) public onlyBuyer(id) inStatus(id, Status.Paid) {\r\n    Order storage o = _orders[id];\r\n    require(block.timestamp > o.deadline, \"Escrow: not yet expired\");\r\n\r\n    o.status = Status.Refunded;\r\n    bool success = IERC20(o.token).transfer(o.buyer, o.amount);\r\n    require(success, \"Escrow: refund transfer failed\");\r\n\r\n    emit OrderRefunded(id);\r\n}\r\n\r\n// ---------- TODO 5：发起争议 ----------\r\n// 要求：只在 Paid 状态；调用者必须是买家或卖家；状态改为 Disputed；发出 OrderDisputed。\r\nfunction dispute(uint256 id) public inStatus(id, Status.Paid) {\r\n    Order storage o = _orders[id];\r\n    require(msg.sender == o.buyer || msg.sender == o.seller, \"Escrow: only buyer or seller can dispute\");\r\n\r\n    o.status = Status.Disputed;\r\n    emit OrderDisputed(id, msg.sender);\r\n}\r\n\r\n// ---------- TODO 6：仲裁 ----------\r\n// 要求：只有仲裁人、只在 Disputed 状态；\r\n// sellerWins 为 true 则状态 Completed、代币给卖家，否则状态 Refunded、代币退买家；\r\n// 发出 OrderResolved。\r\nfunction resolve(uint256 id, bool sellerWins) public onlyArbiter() inStatus(id, Status.Disputed) {\r\n    Order storage o = _orders[id];\r\n    if(sellerWins) {\r\n        // 卖家胜诉：打款给卖家，订单完成\r\n        o.status = Status.Completed;\r\n        bool success = IERC20(o.token).transfer(o.seller, o.amount);\r\n        require(success, \"Escrow: resolve transfer to seller failed\");\r\n    } else {\r\n        // 买家胜诉：退款给买家，订单退款\r\n        o.status = Status.Refunded;\r\n        bool success = IERC20(o.token).transfer(o.buyer, o.amount);\r\n        require(success, \"Escrow: resolve refund to buyer failed\");\r\n    }\r\n    emit OrderResolved(id, sellerWins);\r\n}\r\n}\r\n"
+    }
+  },
+  "settings": {
+    "optimizer": {
+      "enabled": true,
+      "runs": 200
+    },
+    "evmVersion": "paris",
+    "outputSelection": {
+      "*": {
+        "*": [
+          "abi",
+          "evm.bytecode",
+          "evm.deployedBytecode",
+          "evm.methodIdentifiers",
+          "metadata",
+          "devdoc",
+          "userdoc",
+          "storageLayout",
+          "evm.gasEstimates"
+        ],
+        "": [
+          "ast"
+        ]
+      }
+    },
+    "metadata": {
+      "useLiteralContent": true
+    }
+  }
+}

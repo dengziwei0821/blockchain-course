@@ -1,0 +1,38 @@
+# dependencies
+node_modules
+
+# yarn
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# eslint
+.eslintcache
+
+# misc
+.DS_Store
+
+# IDE
+.vscode
+.idea
+
+# cli
+dist
+
+# 环境变量及钱包备份文件
+.env
+.env.*
+!.env.example
+
+# 加密钱包及密钥备份
+*.backup
+*keystore*
+
+# 依赖和缓存
+node_modules/
+.next/
+cache/
+artifacts/
