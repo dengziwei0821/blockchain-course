@@ -121,6 +121,7 @@ my-first-dapp/
 │       │   └── scaffold-eth
 │       └── vercel.json
 └── yarn.lock
+```
 
 ## 4. 环境要求
 
