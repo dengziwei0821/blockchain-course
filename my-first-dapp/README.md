@@ -36,27 +36,91 @@
 
 ```text
 my-first-dapp/
-├── packages/
-│   ├── hardhat/
-│   │   ├── contracts/
-│   │   │   ├── Escrow.sol
-│   │   │   └── HZYToken.sol
-│   │   ├── deploy/
-│   │   │   └── deploy_escrow.ts
-│   │   ├── test/
-│   │   │   └── Escrow.ts
-│   │   └── hardhat.config.ts
-│   │
-│   └── nextjs/
-│       ├── app/
-│       │   └── escrow/
-│       │       └── page.tsx
-│       └── contracts/
-│           └── deployedContracts.ts
-│
+.
+├── CONTRIBUTING.md
+├── LICENCE
+├── README.md
 ├── package.json
-└── README.md
-```
+├── packages
+│   ├── hardhat
+│   │   ├── contracts
+│   │   │   ├── Escrow.sol
+│   │   │   ├── HZYToken.sol
+│   │   │   └── YourContract.sol
+│   │   ├── deploy
+│   │   │   ├── 00_deploy_your_contract.ts
+│   │   │   ├── 01_deploy_token.ts
+│   │   │   ├── 02_deploy_escrow.ts
+│   │   │   └── 99_generateTsAbis.ts
+│   │   ├── deployments
+│   │   │   ├── localhost
+│   │   │   └── potos_testnet
+│   │   ├── eslint.config.mjs
+│   │   ├── hardhat.config.ts
+│   │   ├── package.json
+│   │   ├── scripts
+│   │   │   ├── generateAccount.ts
+│   │   │   ├── generateTsAbis.ts
+│   │   │   ├── importAccount.ts
+│   │   │   ├── listAccount.ts
+│   │   │   ├── revealPK.ts
+│   │   │   └── runHardhatDeployWithPK.ts
+│   │   ├── test
+│   │   │   ├── Escrow.ts
+│   │   │   └── YourContract.ts
+│   │   ├── tsconfig.json
+│   │   └── typechain-types
+│   │       ├── Escrow.sol
+│   │       ├── HZYToken.ts
+│   │       ├── YourContract.ts
+│   │       ├── common.ts
+│   │       ├── factories
+│   │       ├── hardhat.d.ts
+│   │       └── index.ts
+│   └── nextjs
+│       ├── app
+│       │   ├── blockexplorer
+│       │   ├── debug
+│       │   ├── escrow
+│       │   ├── layout.tsx
+│       │   ├── not-found.tsx
+│       │   └── page.tsx
+│       ├── components
+│       │   ├── Footer.tsx
+│       │   ├── Header.tsx
+│       │   ├── ScaffoldEthAppWithProviders.tsx
+│       │   ├── SwitchTheme.tsx
+│       │   ├── ThemeProvider.tsx
+│       │   ├── assets
+│       │   └── scaffold-eth
+│       ├── contracts
+│       │   ├── deployedContracts.ts
+│       │   └── externalContracts.ts
+│       ├── eslint.config.mjs
+│       ├── hooks
+│       │   └── scaffold-eth
+│       ├── next-env.d.ts
+│       ├── next.config.ts
+│       ├── package.json
+│       ├── postcss.config.js
+│       ├── public
+│       │   ├── favicon.png
+│       │   ├── logo.svg
+│       │   ├── manifest.json
+│       │   └── thumbnail.jpg
+│       ├── scaffold.config.ts
+│       ├── services
+│       │   ├── store
+│       │   └── web3
+│       ├── styles
+│       │   └── globals.css
+│       ├── tsconfig.json
+│       ├── types
+│       │   └── abitype
+│       ├── utils
+│       │   └── scaffold-eth
+│       └── vercel.json
+└── yarn.lock
 
 ## 4. 环境要求
 
